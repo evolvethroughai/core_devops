@@ -14,10 +14,19 @@ terraform {
       version = "~> 3.0"
     }
   }
+
+  backend "azurerm" {
+    resource_group_name  = "rg-terraform-state-dev"
+    storage_account_name = "sttfstatemvwcxs"
+    container_name       = "tfstate"
+    key                  = "bootstrap.tfstate"
+  }
 }
 
 provider "azurerm" {
   features {}
+  skip_provider_registration = true
+  subscription_id            = var.subscription_id
 }
 
 provider "azuread" {}
