@@ -55,7 +55,3 @@ resource "azuread_application_federated_identity_credential" "oidc_cred" {
   issuer         = "https://vstoken.dev.azure.com/${var.org_name}"
   subject        = "sc://${var.org_name}/${var.project_name}/${var.service_connection_name}"
 }
-
-output "storage_account_name" {
-  value = azurerm_storage_account.state_sa.name
-}
