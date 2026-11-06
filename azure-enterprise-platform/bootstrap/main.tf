@@ -1,6 +1,6 @@
 # 1. Resource Group for Terraform State
 resource "azurerm_resource_group" "state_rg" {
-  name     = "rg-terraform-state-dev"
+  name     = "rg-terraform-state-test"
   location = "East US"
 }
 
@@ -13,7 +13,7 @@ resource "random_string" "suffix" {
 
 # 3. Storage Account & Container for Remote State Locking
 resource "azurerm_storage_account" "state_sa" {
-  name                            = "sttfstate${random_string.suffix.result}"
+  name                            = "sttfstate123${random_string.suffix.result}"
   resource_group_name             = azurerm_resource_group.state_rg.name
   location                        = azurerm_resource_group.state_rg.location
   account_tier                    = "Standard"
@@ -24,7 +24,7 @@ resource "azurerm_storage_account" "state_sa" {
 
 resource "azurerm_storage_container" "state_container" {
   name                  = "tfstate"
-  storage_account_id    = azurerm_storage_account.state_sa.id
+  storage_account_name  = azurerm_storage_account.state_sa.name
   container_access_type = "private"
 }
 

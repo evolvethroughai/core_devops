@@ -15,18 +15,17 @@ terraform {
     }
   }
 
-  backend "azurerm" {
-    resource_group_name  = "rg-terraform-state-dev"
-    storage_account_name = "sttfstatemvwcxs"
-    container_name       = "tfstate"
-    key                  = "bootstrap.tfstate"
-  }
+  # backend "azurerm" {
+  #   resource_group_name  = "rg-terraform-state-test"
+  #   storage_account_name = "sttfstate123mvwcxs"
+  #   container_name       = "tfstate"
+  #   key                  = "bootstrap.tfstate"
+  # }
 }
 
 provider "azurerm" {
   features {}
-  resource_provider_registrations = "none"
-  subscription_id                 = var.subscription_id
+  subscription_id = var.subscription_id
 }
 
 provider "azuread" {}
