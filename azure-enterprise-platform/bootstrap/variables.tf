@@ -1,11 +1,11 @@
 variable "org_name" {
   type    = string
-  default = "aidevopscore"
+  default = "career2026"
 }
 
 variable "project_name" {
   type    = string
-  default = "core_devops"
+  default = "azure_hands"
 }
 
 variable "service_connection_name" {

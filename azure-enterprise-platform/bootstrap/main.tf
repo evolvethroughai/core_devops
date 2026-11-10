@@ -47,11 +47,12 @@ resource "azurerm_role_assignment" "contrib" {
 }
 
 # 6. Establish OIDC Federated Credential with Azure DevOps
+# 6. Establish OIDC Federated Credential with Azure DevOps
 resource "azuread_application_federated_identity_credential" "oidc_cred" {
   application_id = azuread_application.oidc_app.id
   display_name   = "azdevops-main-branch-federation"
   description    = "OIDC connection for Azure DevOps pipeline"
   audiences      = ["api://AzureADTokenExchange"]
-  issuer         = "https://vstoken.dev.azure.com/${var.org_name}"
-  subject        = "sc://${var.org_name}/${var.project_name}/${var.service_connection_name}"
+  issuer         = "https://vstoken.dev.azure.com/career2026"
+  subject        = "sc://career2026/azure_hands/azure-oidc-service-connection"
 }
