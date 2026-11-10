@@ -13,16 +13,33 @@ stages:
       - job: Plan
         displayName: "Terraform Init & Plan"
         steps:
+          - script: |
+              sudo apt-get update && sudo apt-get install -y curl unzip
+              curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
+              sudo unzip -o terraform.zip -d /usr/local/bin/
+              rm terraform.zip
+              terraform --version
+            displayName: "Install Terraform Binary"
+
           - task: AzureCLI@2
+            displayName: "Terraform Init & Plan"
             inputs:
               azureSubscription: "azure-oidc-service-connection"
               scriptType: "bash"
               scriptLocation: "inlineScript"
+              addSpnToEnvironment: true
+              workingDirectory: "$(System.DefaultWorkingDirectory)/bootstrap"
               inlineScript: |
-                cd environments/dev
+                set -e
+                export ARM_USE_OIDC=true
+                export ARM_CLIENT_ID=$servicePrincipalId
+                export ARM_TENANT_ID=$tenantId
+                export ARM_OIDC_TOKEN=$idToken
+                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
                 terraform init
                 terraform plan -out=tfplan
-          - publish: environments/dev/tfplan
+
+          - publish: $(System.DefaultWorkingDirectory)/bootstrap/tfplan
             artifact: tfplan
 
   - stage: Terraform_Apply
@@ -36,14 +53,30 @@ stages:
           runOnce:
             deploy:
               steps:
+                - checkout: self
                 - download: current
                   artifact: tfplan
+                - script: |
+                    sudo apt-get update && sudo apt-get install -y curl unzip
+                    curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
+                    sudo unzip -o terraform.zip -d /usr/local/bin/
+                    rm terraform.zip
+                    terraform --version
+                  displayName: "Install Terraform Binary"
                 - task: AzureCLI@2
+                  displayName: "Terraform Apply"
                   inputs:
                     azureSubscription: "azure-oidc-service-connection"
                     scriptType: "bash"
                     scriptLocation: "inlineScript"
+                    addSpnToEnvironment: true
+                    workingDirectory: "$(System.DefaultWorkingDirectory)/bootstrap"
                     inlineScript: |
-                      cd environments/dev
+                      set -e
+                      export ARM_USE_OIDC=true
+                      export ARM_CLIENT_ID=$servicePrincipalId
+                      export ARM_TENANT_ID=$tenantId
+                      export ARM_OIDC_TOKEN=$idToken
+                      export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
                       terraform init
                       terraform apply -auto-approve $(Pipeline.Workspace)/tfplan/tfplan
