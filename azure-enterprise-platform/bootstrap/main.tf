@@ -11,9 +11,19 @@ resource "random_string" "suffix" {
   upper   = false
 }
 
-# 3. Storage Account & Container for Remote State Locking
+#3. Storage Account & Container for Remote State Locking
 resource "azurerm_storage_account" "state_sa" {
   name                            = "sttfstate123${random_string.suffix.result}"
+  resource_group_name             = azurerm_resource_group.state_rg.name
+  location                        = azurerm_resource_group.state_rg.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  min_tls_version                 = "TLS1_2"
+  allow_nested_items_to_be_public = false
+}
+
+resource "azurerm_storage_account" "state_sa" {
+  name                            = "sttfstate123456678${random_string.suffix.result}"
   resource_group_name             = azurerm_resource_group.state_rg.name
   location                        = azurerm_resource_group.state_rg.location
   account_tier                    = "Standard"
