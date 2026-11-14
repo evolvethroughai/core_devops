@@ -6,6 +6,8 @@ trigger:
 pool:
   vmImage: "ubuntu-latest"
 
+##this is regarding the security inputs to over ado pipelines which is shift left tf linter and checkov
+
 stages:
   - stage: Security_Lint
     displayName: "Security & Code Linting"
