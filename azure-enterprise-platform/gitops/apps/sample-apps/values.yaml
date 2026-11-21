@@ -1,0 +1,10 @@
+replicaCount: 2
+
+image:
+  repository: acruatent987654.azurecr.io/sample-app
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80

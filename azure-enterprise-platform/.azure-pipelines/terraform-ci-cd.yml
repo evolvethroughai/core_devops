@@ -6,7 +6,7 @@ trigger:
 pool:
   vmImage: "ubuntu-latest"
 
-##this is regarding the security inputs to over ado pipelines which is shift left tf linter and checkov
+## Shift-left security & static analysis with TFLint and Checkov before Terraform Plan/Apply
 
 stages:
   - stage: Security_Lint
@@ -16,16 +16,19 @@ stages:
         steps:
           - checkout: self
           - script: |
+              set -e
               sudo apt-get update && sudo apt-get install -y curl unzip
               curl -sSLo tflint.zip https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_amd64.zip
               unzip -o tflint.zip
               sudo mv tflint /usr/local/bin/
               rm tflint.zip
               tflint --version
+              tflint --init --chdir=environments/uat || true
               tflint --chdir=environments/uat
             displayName: "Run TFLint"
 
           - script: |
+              set -e
               pip install checkov
               checkov -d environments/uat --framework terraform --soft-fail
             displayName: "Run Checkov"
@@ -38,6 +41,7 @@ stages:
         steps:
           - checkout: self
           - script: |
+              set -e
               sudo apt-get update && sudo apt-get install -y curl unzip
               curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
               sudo unzip -o terraform.zip -d /usr/local/bin/
@@ -73,6 +77,7 @@ stages:
     jobs:
       - deployment: Apply
         displayName: "Terraform Apply to UAT"
+        # Allows running terraform apply in UAT environment with approval gates
         environment: "uat"
         strategy:
           runOnce:
@@ -82,10 +87,12 @@ stages:
                 - download: current
                   artifact: tfplan
                 - script: |
+                    set -e
                     sudo apt-get update && sudo apt-get install -y curl unzip
                     curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
                     sudo unzip -o terraform.zip -d /usr/local/bin/
                     rm terraform.zip
+                    terraform --version
                   displayName: "Install Terraform Binary"
                 - task: AzureCLI@2
                   displayName: "Terraform Apply"
@@ -102,7 +109,7 @@ stages:
                       export ARM_TENANT_ID=$tenantId
                       export ARM_OIDC_TOKEN=$idToken
                       export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
-                      ###its for initializing the terraform backend configuration
+                      # Initialize Terraform backend configuration
                       terraform init -reconfigure -backend-config=backend.hcl
-                      ##its for applying the plan file which is downloaded from the previous stage
-                      terraform apply -auto-approve $(Pipeline.Workspace)/tfplan/tfpl
+                      # Apply the plan file downloaded from the Terraform_Plan artifact
+                      terraform apply -auto-approve $(Pipeline.Workspace)/tfplan/tfplan

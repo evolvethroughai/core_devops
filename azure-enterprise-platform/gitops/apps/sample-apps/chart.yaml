@@ -1,0 +1,6 @@
+apiVersion: v2
+name: sample-app
+description: Sample UAT application deployed via ArgoCD from Azure Repos
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

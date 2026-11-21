@@ -130,5 +130,26 @@ resource "azurerm_private_dns_zone_virtual_network_link" "spoke_dns_link" {
   virtual_network_id    = azurerm_virtual_network.spoke_uat.id
 }
 
+# 7. Private DNS Zone for Key Vault Private Link
+resource "azurerm_private_dns_zone" "kv_dns" {
+  name                = "privatelink.vaultcore.azure.net"
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "hub_kv_dns_link" {
+  name                  = "link-hub-kv-dns"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.kv_dns.name
+  virtual_network_id    = azurerm_virtual_network.hub.id
+}
+
+resource "azurerm_private_dns_zone_virtual_network_link" "spoke_kv_dns_link" {
+  name                  = "link-spoke-uat-kv-dns"
+  resource_group_name   = var.resource_group_name
+  private_dns_zone_name = azurerm_private_dns_zone.kv_dns.name
+  virtual_network_id    = azurerm_virtual_network.spoke_uat.id
+}
+
 output "pe_subnet_id" { value = azurerm_subnet.spoke_pe.id }
 output "blob_dns_zone_id" { value = azurerm_private_dns_zone.blob_dns.id }
+output "kv_dns_zone_id" { value = azurerm_private_dns_zone.kv_dns.id }
