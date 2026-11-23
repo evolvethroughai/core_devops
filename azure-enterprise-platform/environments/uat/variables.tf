@@ -58,8 +58,8 @@ variable "aks_cluster_name_prefix" {
   default     = "aks-uat-ent"
 }
 
-variable "argocd_namespace" {
-  type        = string
-  description = "Kubernetes namespace for ArgoCD"
-  default     = "argocd"
-}
+# variable "argocd_namespace" {
+#   type        = string
+#   description = "Kubernetes namespace for ArgoCD"
+#   default     = "argocd"
+# }

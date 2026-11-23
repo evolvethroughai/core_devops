@@ -8,6 +8,11 @@ pool:
 
 ## Shift-left security & static analysis with TFLint and Checkov before Terraform Plan/Apply
 
+variables:
+  tfVersion: "1.8.5"
+  tfWorkingDir: "$(Build.SourcesDirectory)/environments/uat"
+  azureServiceConnection: "azure-oidc-service-connection"
+
 stages:
   - stage: Security_Lint
     displayName: "Security & Code Linting"
@@ -16,21 +21,29 @@ stages:
         steps:
           - checkout: self
           - script: |
-              set -e
-              sudo apt-get update && sudo apt-get install -y curl unzip
-              curl -sSLo tflint.zip https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_amd64.zip
-              unzip -o tflint.zip
-              sudo mv tflint /usr/local/bin/
-              rm tflint.zip
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+                sudo apt-get -o APT::Acquire::Retries=3 update -qq
+                sudo apt-get -o APT::Acquire::Retries=3 install -y -qq curl unzip
+              fi
+              curl -sSLo /tmp/tflint.zip https://github.com/terraform-linters/tflint/releases/latest/download/tflint_linux_amd64.zip
+              unzip -qo /tmp/tflint.zip -d /tmp/tflint_bin
+              sudo install -m 0755 /tmp/tflint_bin/tflint /usr/local/bin/tflint
+              rm -rf /tmp/tflint.zip /tmp/tflint_bin
               tflint --version
               tflint --init --chdir=environments/uat || true
               tflint --chdir=environments/uat
             displayName: "Run TFLint"
 
           - script: |
-              set -e
-              pip install checkov
-              checkov -d environments/uat --framework terraform --soft-fail
+              set -euo pipefail
+              docker pull bridgecrew/checkov:latest
+              docker run --rm \
+                -v "$(Build.SourcesDirectory)/environments/uat:/tf" \
+                -w /tf \
+                bridgecrew/checkov:latest \
+                -d . --framework terraform --soft-fail
             displayName: "Run Checkov"
 
   - stage: Terraform_Plan
@@ -41,33 +54,38 @@ stages:
         steps:
           - checkout: self
           - script: |
-              set -e
-              sudo apt-get update && sudo apt-get install -y curl unzip
-              curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
-              sudo unzip -o terraform.zip -d /usr/local/bin/
-              rm terraform.zip
+              set -euo pipefail
+              export DEBIAN_FRONTEND=noninteractive
+              if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+                sudo apt-get -o APT::Acquire::Retries=3 update -qq
+                sudo apt-get -o APT::Acquire::Retries=3 install -y -qq curl unzip
+              fi
+              curl -sSLo /tmp/terraform.zip "https://releases.hashicorp.com/terraform/$(tfVersion)/terraform_$(tfVersion)_linux_amd64.zip"
+              unzip -qo /tmp/terraform.zip -d /tmp/tf_bin
+              sudo install -m 0755 /tmp/tf_bin/terraform /usr/local/bin/terraform
+              rm -rf /tmp/terraform.zip /tmp/tf_bin
               terraform --version
             displayName: "Install Terraform Binary"
 
           - task: AzureCLI@2
             displayName: "Terraform Init & Plan"
             inputs:
-              azureSubscription: "azure-oidc-service-connection"
+              azureSubscription: "$(azureServiceConnection)"
               scriptType: "bash"
               scriptLocation: "inlineScript"
               addSpnToEnvironment: true
-              workingDirectory: "$(Build.SourcesDirectory)/environments/uat"
+              workingDirectory: "$(tfWorkingDir)"
               inlineScript: |
-                set -e
+                set -euo pipefail
                 export ARM_USE_OIDC=true
-                export ARM_CLIENT_ID=$servicePrincipalId
-                export ARM_TENANT_ID=$tenantId
-                export ARM_OIDC_TOKEN=$idToken
-                export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                export ARM_CLIENT_ID="$servicePrincipalId"
+                export ARM_TENANT_ID="$tenantId"
+                export ARM_OIDC_TOKEN="$idToken"
+                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
                 terraform init -reconfigure -backend-config=backend.hcl
                 terraform plan -out=tfplan
 
-          - publish: $(Build.SourcesDirectory)/environments/uat/tfplan
+          - publish: "$(tfWorkingDir)/tfplan"
             artifact: tfplan
             displayName: "Publish Plan Artifact"
 
@@ -87,29 +105,34 @@ stages:
                 - download: current
                   artifact: tfplan
                 - script: |
-                    set -e
-                    sudo apt-get update && sudo apt-get install -y curl unzip
-                    curl -sSLo terraform.zip https://releases.hashicorp.com/terraform/1.8.5/terraform_1.8.5_linux_amd64.zip
-                    sudo unzip -o terraform.zip -d /usr/local/bin/
-                    rm terraform.zip
+                    set -euo pipefail
+                    export DEBIAN_FRONTEND=noninteractive
+                    if ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+                      sudo apt-get -o APT::Acquire::Retries=3 update -qq
+                      sudo apt-get -o APT::Acquire::Retries=3 install -y -qq curl unzip
+                    fi
+                    curl -sSLo /tmp/terraform.zip "https://releases.hashicorp.com/terraform/$(tfVersion)/terraform_$(tfVersion)_linux_amd64.zip"
+                    unzip -qo /tmp/terraform.zip -d /tmp/tf_bin
+                    sudo install -m 0755 /tmp/tf_bin/terraform /usr/local/bin/terraform
+                    rm -rf /tmp/terraform.zip /tmp/tf_bin
                     terraform --version
                   displayName: "Install Terraform Binary"
                 - task: AzureCLI@2
                   displayName: "Terraform Apply"
                   inputs:
-                    azureSubscription: "azure-oidc-service-connection"
+                    azureSubscription: "$(azureServiceConnection)"
                     scriptType: "bash"
                     scriptLocation: "inlineScript"
                     addSpnToEnvironment: true
-                    workingDirectory: "$(Build.SourcesDirectory)/environments/uat"
+                    workingDirectory: "$(tfWorkingDir)"
                     inlineScript: |
-                      set -e
+                      set -euo pipefail
                       export ARM_USE_OIDC=true
-                      export ARM_CLIENT_ID=$servicePrincipalId
-                      export ARM_TENANT_ID=$tenantId
-                      export ARM_OIDC_TOKEN=$idToken
-                      export ARM_SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+                      export ARM_CLIENT_ID="$servicePrincipalId"
+                      export ARM_TENANT_ID="$tenantId"
+                      export ARM_OIDC_TOKEN="$idToken"
+                      export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
                       # Initialize Terraform backend configuration
                       terraform init -reconfigure -backend-config=backend.hcl
                       # Apply the plan file downloaded from the Terraform_Plan artifact
-                      terraform apply -auto-approve $(Pipeline.Workspace)/tfplan/tfplan
+                      terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan/tfplan"
