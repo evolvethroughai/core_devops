@@ -48,6 +48,7 @@ stages:
             displayName: "Run Checkov"
 
   - stage: Terraform_Plan
+    #terraform planning
     displayName: "Terraform Plan Stage"
     dependsOn: Security_Lint
     jobs:

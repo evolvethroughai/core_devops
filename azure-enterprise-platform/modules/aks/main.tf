@@ -9,11 +9,12 @@ resource "azurerm_kubernetes_cluster" "primary_active" {
   location            = var.primary_location
   resource_group_name = var.resource_group_name
   dns_prefix          = "${var.cluster_name_prefix}-pri"
+  oidc_issuer_enabled = true
 
   default_node_pool {
     name       = "systempool"
-    node_count = 2
-    vm_size    = "Standard_D2s_v3"
+    node_count = 1
+    vm_size    = "Standard_D2s_v7" # 2 vCPUs, 8 GB (was standard_d128alds_v7 = 128 vCPUs)
   }
 
   identity {
@@ -31,11 +32,12 @@ resource "azurerm_kubernetes_cluster" "secondary_passive" {
   location            = var.secondary_location
   resource_group_name = var.resource_group_name
   dns_prefix          = "${var.cluster_name_prefix}-sec"
+  oidc_issuer_enabled = true
 
   default_node_pool {
     name       = "systempool"
     node_count = 1
-    vm_size    = "Standard_D2s_v3"
+    vm_size    = "Standard_D2s_v7" # 2 vCPUs, 8 GB (was standard_b16as_v2 = 16 vCPUs)
   }
 
   identity {
