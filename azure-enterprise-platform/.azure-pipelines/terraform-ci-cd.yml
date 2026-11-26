@@ -12,6 +12,7 @@ variables:
   tfVersion: "1.8.5"
   tfWorkingDir: "$(Build.SourcesDirectory)/environments/uat"
   azureServiceConnection: "azure-oidc-service-connection"
+  keyVaultName: "kv-uat-ent-987654"
 
 stages:
   - stage: Security_Lint
@@ -67,6 +68,24 @@ stages:
               terraform --version
             displayName: "Install Terraform Binary"
 
+          # ---- NEW: open Key Vault firewall for this agent's IP ----
+          - task: AzureCLI@2
+            displayName: "Open Key Vault firewall for agent IP"
+            inputs:
+              azureSubscription: "$(azureServiceConnection)"
+              scriptType: "bash"
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                set -euo pipefail
+                IP=$(curl -s https://api.ipify.org)
+                echo "Agent IP: $IP"
+                echo "##vso[task.setvariable variable=AGENT_IP]$IP"
+                az keyvault update --name "$(keyVaultName)" \
+                  --public-network-access Enabled --default-action Deny
+                az keyvault network-rule add --name "$(keyVaultName)" \
+                  --ip-address "$IP/32"
+                sleep 60   # firewall rule propagation
+
           - task: AzureCLI@2
             displayName: "Terraform Init & Plan"
             inputs:
@@ -84,6 +103,22 @@ stages:
                 export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
                 terraform init -reconfigure -backend-config=backend.hcl
                 terraform plan -out=tfplan
+
+          # ---- NEW: always close the firewall again ----
+          - task: AzureCLI@2
+            displayName: "Close Key Vault firewall"
+            condition: always()
+            inputs:
+              azureSubscription: "$(azureServiceConnection)"
+              scriptType: "bash"
+              scriptLocation: "inlineScript"
+              inlineScript: |
+                if [ -n "${AGENT_IP:-}" ]; then
+                  az keyvault network-rule remove --name "$(keyVaultName)" \
+                    --ip-address "$AGENT_IP/32" || true
+                fi
+                az keyvault update --name "$(keyVaultName)" \
+                  --public-network-access Disabled || true
 
           - publish: "$(tfWorkingDir)/tfplan"
             artifact: tfplan
@@ -117,6 +152,25 @@ stages:
                     rm -rf /tmp/terraform.zip /tmp/tf_bin
                     terraform --version
                   displayName: "Install Terraform Binary"
+
+                # ---- NEW: open Key Vault firewall for this agent's IP ----
+                - task: AzureCLI@2
+                  displayName: "Open Key Vault firewall for agent IP"
+                  inputs:
+                    azureSubscription: "$(azureServiceConnection)"
+                    scriptType: "bash"
+                    scriptLocation: "inlineScript"
+                    inlineScript: |
+                      set -euo pipefail
+                      IP=$(curl -s https://api.ipify.org)
+                      echo "Agent IP: $IP"
+                      echo "##vso[task.setvariable variable=AGENT_IP]$IP"
+                      az keyvault update --name "$(keyVaultName)" \
+                        --public-network-access Enabled --default-action Deny
+                      az keyvault network-rule add --name "$(keyVaultName)" \
+                        --ip-address "$IP/32"
+                      sleep 60   # firewall rule propagation
+
                 - task: AzureCLI@2
                   displayName: "Terraform Apply"
                   inputs:
@@ -136,3 +190,19 @@ stages:
                       terraform init -reconfigure -backend-config=backend.hcl
                       # Apply the plan file downloaded from the Terraform_Plan artifact
                       terraform apply -auto-approve "$(Pipeline.Workspace)/tfplan/tfplan"
+
+                # ---- NEW: always close the firewall again ----
+                - task: AzureCLI@2
+                  displayName: "Close Key Vault firewall"
+                  condition: always()
+                  inputs:
+                    azureSubscription: "$(azureServiceConnection)"
+                    scriptType: "bash"
+                    scriptLocation: "inlineScript"
+                    inlineScript: |
+                      if [ -n "${AGENT_IP:-}" ]; then
+                        az keyvault network-rule remove --name "$(keyVaultName)" \
+                          --ip-address "$AGENT_IP/32" || true
+                      fi
+                      az keyvault update --name "$(keyVaultName)" \
+                        --public-network-access Disabled || true
